@@ -1,0 +1,167 @@
+:root{
+  --bg:#f6f7fb; 
+  --card:#fff; 
+  --text:#111318; 
+  --muted:#6b7280;
+  --primary:#2563eb; 
+  --primary-fg:#fff; 
+  --danger:#dc2626; 
+  --border:#e5e7eb;
+  --shadow:0 10px 24px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.05);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+  background:linear-gradient(#fafbfe,#f4f6fb);
+  color:var(--text);
+  font-size:18px;       /* bigger base */
+  line-height:1.7;      /* more air */
+  -webkit-font-smoothing:antialiased; 
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* --- New App Title Header --- */
+.app-header {
+  background: linear-gradient(135deg, #4a90e2, #7b4397);
+  color: white;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.app-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+/* --- Existing Topbar (buttons + Online badge) --- */
+.topbar{
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between;
+  padding:16px 24px;
+  background:#fff;
+  color:var(--text);
+  border-bottom:1px solid var(--border);
+}
+.topbar h1{
+  margin:0; 
+  font-size:20px; 
+  font-weight:700;
+}
+.topbar h1 .muted{font-weight:400; color:var(--muted)}
+.top-actions{display:flex; gap:12px; align-items:center}
+.badge{
+  padding:6px 10px; 
+  border-radius:12px; 
+  background:#22c55e; 
+  color:#fff; 
+  font-size:14px
+}
+
+.container{max-width:1100px; margin:24px auto; padding:0 16px}
+
+.card{
+  background:var(--card); 
+  border:1px solid var(--border); 
+  border-radius:16px;
+  padding:22px; 
+  margin-bottom:18px; 
+  box-shadow:var(--shadow);
+}
+.card > h2{margin:0 0 12px; font-size:22px; font-weight:800}
+
+.word-row{display:flex; gap:10px}
+.word-row input{
+  flex:1; 
+  font-size:20px; 
+  padding:12px 14px;
+  border:1px solid var(--border); 
+  border-radius:10px; 
+  background:#fff;
+}
+button{
+  padding:12px 16px; 
+  border-radius:10px; 
+  border:1px solid var(--border);
+  background:#fff; 
+  color:var(--text); 
+  font-size:16px; 
+  cursor:pointer;
+  transition:transform .06s, box-shadow .12s, background .12s;
+}
+button:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.06) }
+button:active{ transform:translateY(0) }
+button.primary{ background:var(--primary); color:var(--primary-fg); border-color:var(--primary) }
+button.danger{ background:var(--danger); color:#fff; border-color:var(--danger) }
+button:disabled{ opacity:.55; cursor:not-allowed }
+
+.hint{ color:var(--muted); font-size:14px; margin:10px 0 0 }
+
+/* Results grid — definition boxes */
+.results{
+  display:grid; 
+  grid-template-columns:repeat(auto-fill,minmax(360px,1fr));
+  gap:16px; 
+  margin-top:16px;
+}
+.cardlet{
+  border:1px solid var(--border); 
+  border-radius:14px; 
+  padding:16px; 
+  background:#fff;
+  display:flex; 
+  flex-direction:column; 
+  gap:8px; 
+  box-shadow:var(--shadow);
+}
+.cardlet h3{margin:0; font-size:18px}
+.field{font-size:16px}           
+.field label{font-weight:800}
+.actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+
+/* Glossary */
+.filters{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px}
+.filters input, .filters select{
+  padding:10px 12px; 
+  border:1px solid var(--border); 
+  border-radius:10px; 
+  font-size:16px
+}
+.table-wrap{overflow:auto}
+table{width:100%; border-collapse:collapse; font-size:16px}
+thead th{
+  text-align:left; 
+  background:#eef2f7; 
+  border-bottom:1px solid var(--border); 
+  padding:12px; 
+  position:sticky; 
+  top:0; 
+  z-index:1; 
+  font-weight:800
+}
+tbody td{ 
+  border-top:1px solid var(--border); 
+  padding:12px; 
+  vertical-align:top 
+}
+tbody tr:nth-child(odd){ background:#fbfbfd }
+
+.footer{padding:18px; text-align:center; color:var(--muted)}
+
+@media (prefers-color-scheme: dark){
+  :root{ 
+    --bg:#0b0d11; 
+    --card:#0f1217; 
+    --text:#e8eaf0; 
+    --muted:#9aa3b2; 
+    --border:#242a33;
+    --shadow:0 10px 24px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.35); 
+  }
+  .topbar{ background:#0f1217; border-bottom-color:#1f2430 }
+  thead th{ background:#12161d }
+  tbody tr:nth-child(odd){ background:#0c1016 }
+}

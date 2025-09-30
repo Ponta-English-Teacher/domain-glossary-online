@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Glossary Making App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- New App Title Bar -->
+  <header class="app-header">
+    <h1>Glossary Making App</h1>
+  </header>
+
+  <!-- Existing topbar (buttons + Online badge) -->
+  <header class="topbar">
+    <h1>Domain Glossary <span class="muted">Online</span></h1>
+    <div class="top-actions">
+      <button id="btnDownloadTSV" title="Download my glossary as TSV">Download TSV</button>
+      <button id="btnClearAll" class="danger" title="Delete my glossary (local)">Clear My Glossary</button>
+      <span id="netBadge" class="badge" aria-live="polite">Online</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Search -->
+    <section class="card">
+      <h2>Search</h2>
+      <div class="word-row">
+        <input id="wordInput" type="text" placeholder="Enter a word or short phrase (not a full sentence)" autocomplete="off" />
+        <button id="btnSearch" class="primary">Search</button>
+      </div>
+      <p class="hint">Results show a General card and relevant domain cards automatically. Keep definitions compact (≤ ~25 words) with direct Japanese equivalents.</p>
+      <div id="results" class="results" aria-live="polite"></div>
+    </section>
+
+    <!-- Glossary -->
+    <section class="card">
+      <h2>My Glossary</h2>
+      <div class="filters">
+        <input id="filterText" type="text" placeholder="Filter Word / Definition / Translation" />
+        <select id="filterDomain">
+          <option value="">All domains</option>
+        </select>
+        <button id="btnResetFilters">Reset</button>
+      </div>
+      <div class="table-wrap">
+        <table id="glossaryTable">
+          <thead>
+            <tr>
+              <th>Word</th>
+              <th>Sense</th>
+              <th>Definition (EN)</th>
+              <th>Translation (JA)</th>
+              <th>Example</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <small class="hint">Tip: TSV imports cleanly to Google Sheets later.</small>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <small>Definitions and examples are generated fresh (no copying from proprietary dictionaries). Audio “Play” will use Azure TTS later.</small>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
