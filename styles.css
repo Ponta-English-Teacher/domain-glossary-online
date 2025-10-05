@@ -23,7 +23,7 @@ body{
   -moz-osx-font-smoothing:grayscale;
 }
 
-/* --- New App Title Header --- */
+/* --- App Title Header --- */
 .app-header {
   background: linear-gradient(135deg, #4a90e2, #7b4397);
   color: white;
@@ -37,7 +37,7 @@ body{
   font-weight: 800;
 }
 
-/* --- Existing Topbar (buttons + Online badge) --- */
+/* --- Topbar (buttons + Online badge) --- */
 .topbar{
   display:flex; 
   align-items:center; 
@@ -150,8 +150,10 @@ tbody td{
 }
 tbody tr:nth-child(odd){ background:#fbfbfd }
 
+/* Footer */
 .footer{padding:18px; text-align:center; color:var(--muted)}
 
+/* Dark mode */
 @media (prefers-color-scheme: dark){
   :root{ 
     --bg:#0b0d11; 
@@ -165,3 +167,88 @@ tbody tr:nth-child(odd){ background:#fbfbfd }
   thead th{ background:#12161d }
   tbody tr:nth-child(odd){ background:#0c1016 }
 }
+
+/* =========================================================
+   Glossary responsiveness & compactness
+   ========================================================= */
+
+/* Horizontal scroll wrapper */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { width: 100%; table-layout: fixed; }
+
+/* Controls row inside glossary card */
+.glossary-controls{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; margin:8px 0 6px; }
+
+/* Make long tokens wrap (don’t stretch table) */
+.table-scroll th,
+.table-scroll td{
+  white-space: normal;
+  overflow-wrap: anywhere;   /* break long words/URLs */
+  word-break: break-word;
+}
+
+/* Sticky first column (Word) for horizontal scrolling */
+.table-scroll th:first-child,
+.table-scroll td:first-child{
+  position: sticky;
+  left: 0;
+  background: var(--card);
+  z-index: 3;                /* above other cells */
+  box-shadow: 1px 0 0 var(--border); /* subtle divider */
+}
+/* When header row + first column overlap, keep header on top */
+.table-scroll thead th:first-child{ z-index: 4; }
+
+/* Compact mode (toggle via JS) */
+.table-scroll.compact th,
+.table-scroll.compact td{
+  padding: 6px 8px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+/* Hide CreatedAt in compact mode as well */
+.table-scroll.compact #glossaryTable th:nth-child(7),
+.table-scroll.compact #glossaryTable td:nth-child(7){
+  display: none;
+}
+
+/* Responsive: hide CreatedAt on narrower screens (keeps wide screens clean) */
+@media (max-width: 1100px){
+  #glossaryTable th:nth-child(7),
+  #glossaryTable td:nth-child(7){ display: none; }
+}
+
+/* Responsive: progressively hide low-priority columns on very small screens */
+@media (max-width: 900px){
+  #glossaryTable th:nth-child(5),  /* Example */
+  #glossaryTable td:nth-child(5){ display: none; }
+}
+@media (max-width: 720px){
+  #glossaryTable th:nth-child(6),  /* Note */
+  #glossaryTable td:nth-child(6){ display: none; }
+}
+
+/* Optional: visuals for staged/invalid cells */
+td.staged{ outline: 2px solid rgba(37,99,235,.35); background: rgba(37,99,235,.06); }
+td.cell-error{ outline: 2px solid rgba(220,38,38,.45); background: rgba(220,38,38,.07); }
+
+/* Avoid double scrollbars if a wrapper already had overflow */
+.table-wrap{ overflow: visible; }
+
+/* =========================================================
+   Layout cap for header and topbar (match .container)
+   ========================================================= */
+.app-header,
+.topbar{
+  max-width: 1100px;         /* match .container */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 16px;         /* match .container side padding */
+  padding-right: 16px;
+  border-radius: 12px;        /* optional: looks nicer when not full-width */
+}
+
+/* spacing around them */
+.app-header{ margin-top: 12px; margin-bottom: 12px; }
+.topbar{     margin-bottom: 16px; }
