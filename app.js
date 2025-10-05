@@ -886,3 +886,55 @@ const DataBox = (() => {
 
 // Make sure DataBox wiring runs once after initial render
 DataBox.wireTable();
+
+// === Missing Example/Note filters (non-invasive) ===
+(function(){
+  const filters = document.querySelector(".filters");
+  if (!filters) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "missing-filters";
+  wrap.innerHTML = `
+    <label class="chk"><input type="checkbox" id="onlyMissingExample"> Only missing Example</label>
+    <label class="chk"><input type="checkbox" id="onlyMissingNote"> Only missing Note</label>
+  `;
+  filters.appendChild(wrap);
+
+  const chkEx    = document.getElementById("onlyMissingExample");
+  const chkNote  = document.getElementById("onlyMissingNote");
+  const resetBtn = document.getElementById("btnResetFilters");
+
+  function applyMissingFilters(){
+    const tbody = document.querySelector("#glossaryTable tbody");
+    if (!tbody) return;
+    const wantExMissing   = !!chkEx?.checked;
+    const wantNoteMissing = !!chkNote?.checked;
+
+    for (const tr of tbody.rows) {
+      const example = (tr.cells[4]?.textContent || "").trim(); // Example col
+      const note    = (tr.cells[5]?.textContent || "").trim(); // Note col
+      const okEx    = !wantExMissing   || example === "";
+      const okNote  = !wantNoteMissing || note === "";
+      tr.style.display = (okEx && okNote) ? "" : "none";
+    }
+  }
+
+  chkEx?.addEventListener("change", applyMissingFilters);
+  chkNote?.addEventListener("change", applyMissingFilters);
+
+  resetBtn?.addEventListener("click", () => {
+    if (chkEx)   chkEx.checked = false;
+    if (chkNote) chkNote.checked = false;
+    setTimeout(applyMissingFilters, 0); // after your existing reset logic
+  });
+
+  // Re-apply when table re-renders
+  const tbody = document.querySelector("#glossaryTable tbody");
+  if (tbody) {
+    new MutationObserver(() => applyMissingFilters())
+      .observe(tbody, { childList: true });
+  }
+
+  // First run
+  applyMissingFilters();
+})();
