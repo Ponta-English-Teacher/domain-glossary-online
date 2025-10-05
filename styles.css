@@ -252,3 +252,8 @@ td.cell-error{ outline: 2px solid rgba(220,38,38,.45); background: rgba(220,38,3
 /* spacing around them */
 .app-header{ margin-top: 12px; margin-bottom: 12px; }
 .topbar{     margin-bottom: 16px; }
+
+/* Filters for missing fields */
+.missing-filters{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.missing-filters .chk{ font-size:14px; color:var(--muted); }
+.missing-filters input{ transform: translateY(1px); }
