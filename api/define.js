@@ -1,4 +1,3 @@
-/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 // api/define.js
 // POST { term } -> JSON (general + domains + synonyms/antonyms optional view-only)
 // Returns collocation/phrase-style examples (not sentences) and a short note.
