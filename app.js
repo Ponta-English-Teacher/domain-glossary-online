@@ -353,8 +353,9 @@ function renderResults(typedTerm, data) {
 
   if (Array.isArray(data.synonyms) && data.synonyms.length) genCard.appendChild(kv("Synonyms", data.synonyms.join(", ")));
   if (Array.isArray(data.antonyms) && data.antonyms.length) genCard.appendChild(kv("Antonyms", data.antonyms.join(", ")));
-  renderRelatedForms(genCard, data.related_forms);
   el.results.appendChild(genCard);
+
+  renderWordFamily(data.word_family || data.related_forms, data.headword || typedTerm);
 
   // Domain cards
   (data.domains || []).forEach((d) => {
@@ -402,23 +403,80 @@ function renderResults(typedTerm, data) {
   });
 }
 
-function renderRelatedForms(parentEl, related) {
+function renderWordFamily(related, headword) {
   if (!Array.isArray(related) || related.length === 0) return;
-  const wrap = document.createElement("div");
-  wrap.className = "related-forms";
-  const h = document.createElement("h3");
-  h.textContent = "Related forms";
-  wrap.appendChild(h);
-  const ul = document.createElement("ul");
+
+  const section = document.createElement("section");
+  section.className = "card word-family-card";
+
+  const heading = document.createElement("div");
+  heading.className = "word-family-heading";
+  const titleWrap = document.createElement("div");
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "Morphology";
+  const title = document.createElement("h2");
+  title.textContent = "Word family";
+  const intro = document.createElement("p");
+  intro.className = "hint";
+  intro.textContent = `Base and derived forms related to “${headword}”.`;
+  titleWrap.append(eyebrow, title, intro);
+  heading.appendChild(titleWrap);
+  section.appendChild(heading);
+
+  const grid = document.createElement("div");
+  grid.className = "word-family-grid";
   related.forEach((r) => {
-    const li = document.createElement("li");
-    const pos = r.pos ? ` (${r.pos})` : "";
-    const ja = r.ja_gloss ? ` = ${r.ja_gloss}` : "";
-    li.textContent = `${r.form}${pos}${ja}`;
-    ul.appendChild(li);
+    if (!r?.form) return;
+    const item = document.createElement("article");
+    item.className = "word-family-item";
+
+    const top = document.createElement("div");
+    top.className = "word-family-top";
+    const form = document.createElement("h3");
+    form.textContent = r.form;
+    const relation = document.createElement("span");
+    relation.className = "relation-badge";
+    relation.textContent = r.relation || "related form";
+    top.append(form, relation);
+    item.appendChild(top);
+
+    if (r.pos) {
+      const pos = document.createElement("span");
+      pos.className = "dict-pos";
+      pos.textContent = r.pos;
+      item.appendChild(pos);
+    }
+
+    const definition = document.createElement("p");
+    definition.className = "word-family-definition";
+    definition.textContent = r.definition_en || "—";
+    item.appendChild(definition);
+
+    const translation = document.createElement("p");
+    translation.className = "word-family-translation";
+    translation.textContent = r.translation_ja || r.ja_gloss || "";
+    if (translation.textContent) item.appendChild(translation);
+
+    const actions = document.createElement("div");
+    actions.className = "word-family-actions";
+    const add = document.createElement("button");
+    add.className = "dict-add-btn";
+    add.textContent = "+ Add";
+    add.addEventListener("click", () => addToGlossary({
+      word: r.form,
+      sense: `Word family · ${r.relation || "related form"}${r.pos ? ` (${r.pos})` : ""}`,
+      definition_en: r.definition_en || "",
+      translation_ja: r.translation_ja || r.ja_gloss || "",
+      example_en: "",
+      note: `Related to ${headword}`,
+    }));
+    actions.append(add, makeTTSBtn(`${r.form}. ${r.definition_en || ""}`));
+    item.appendChild(actions);
+    grid.appendChild(item);
   });
-  wrap.appendChild(ul);
-  parentEl.appendChild(wrap);
+  section.appendChild(grid);
+  el.results.appendChild(section);
 }
 
 // -------------------------------

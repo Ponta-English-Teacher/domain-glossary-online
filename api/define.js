@@ -45,6 +45,15 @@ export default async function handler(req, res) {
       '      "note": string|undefined          // one short tip',
       "    }",
       "  ],",
+      '  "word_family": [',
+      '    {',
+      '      "form": string,',
+      '      "relation": "headword"|"base/stem"|"derivative"|"related form",',
+      '      "pos": string,',
+      '      "definition_en": string,',
+      '      "translation_ja": string',
+      '    }',
+      "  ],",
       '  "synonyms": string[]|[],              // optional, view-only',
       '  "antonyms": string[]|[]               // optional, view-only',
       "}",
@@ -55,6 +64,16 @@ export default async function handler(req, res) {
       "- Domains include only specialist academic senses (max 3).",
       "- If misspelling is obvious, set corrected_to; else null.",
       "- did_you_mean may list up to 3 alternatives.",
+      "",
+      "WORD FAMILY:",
+      "- Include the most useful base/stem and derived forms (3–6 items).",
+      "- Include the queried headword itself, labeled headword.",
+      "- Include derivational forms (noun, verb, adjective, adverb, agent noun).",
+      "- Do NOT include simple tense, participle, comparative, or plural forms (e.g. interpreted, interpreting, interpretations).",
+      "- Include only common, useful forms; do not invent or include obscure formations.",
+      "- Each definition_en is concise (≤18 words) and specific to that form.",
+      "- translation_ja is a short, direct Japanese equivalent.",
+      "- Use an empty array when no reliable word family exists.",
       "",
       "COLLOCATION/PHRASE EXAMPLES:",
       "- Output 1–3 collocations/short phrases, separated by semicolons ';'.",
@@ -76,7 +95,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0.2,
-        max_tokens: 700,
+        max_tokens: 1000,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
@@ -130,6 +149,39 @@ export default async function handler(req, res) {
     const synonyms = (Array.isArray(out.synonyms) ? out.synonyms : []).filter(isShortWord);
     const antonyms = (Array.isArray(out.antonyms) ? out.antonyms : []).filter(isShortWord);
 
+    // Compact morphological word family for learner reference
+    const rawWordFamily = Array.isArray(out.word_family) ? out.word_family : [];
+    const wordFamily = rawWordFamily
+      .filter((item) => item && typeof item.form === "string" && item.definition_en)
+      .slice(0, 6)
+      .map((item) => ({
+        form: cleanShortText(item.form, 60),
+        relation: ["headword", "base/stem", "derivative", "related form"].includes(item.relation)
+          ? item.relation
+          : "related form",
+        pos: cleanShortText(item.pos, 30),
+        definition_en: cleanShortText(item.definition_en, 180),
+        translation_ja: cleanShortText(item.translation_ja, 100),
+      }))
+      .filter((item) => item.form && item.definition_en);
+    const baseForms = wordFamily.filter((item) => item.relation === "base/stem").map((item) => item.form);
+    for (let i = wordFamily.length - 1; i >= 0; i--) {
+      const item = wordFamily[i];
+      if (item.relation === "derivative" && baseForms.some((base) => isSimpleInflection(item.form, base))) {
+        wordFamily.splice(i, 1);
+      }
+    }
+    if (!wordFamily.some((item) => item.form.toLowerCase() === headword.toLowerCase())) {
+      wordFamily.unshift({
+        form: headword,
+        relation: "headword",
+        pos: cleanShortText(rawGen.pos, 30),
+        definition_en: cleanShortText(rawGen.definition_en, 180),
+        translation_ja: cleanShortText(rawGen.translation_ja, 100),
+      });
+    }
+    wordFamily.splice(6);
+
     const shaped = {
       headword,
       corrected_to: out.corrected_to ?? null,
@@ -141,6 +193,7 @@ export default async function handler(req, res) {
         note: genNote,
       },
       domains: shapedDomains,
+      word_family: wordFamily,
       synonyms,
       antonyms,
     };
@@ -215,6 +268,21 @@ function isShortWord(s) {
   return typeof s === "string" && s.trim().length > 0 && s.trim().length <= 20 && !/[;,.]/.test(s);
 }
 
+function cleanShortText(value, maxLength) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, maxLength) : "";
+}
+
+function isSimpleInflection(form, base) {
+  const f = form.toLowerCase();
+  const b = base.toLowerCase();
+  const variants = new Set([
+    `${b}s`, `${b}es`, `${b}ed`, `${b}ing`,
+    b.endsWith("e") ? `${b.slice(0, -1)}ing` : "",
+    b.endsWith("e") ? `${b}d` : "",
+  ]);
+  return variants.has(f);
+}
+
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -232,6 +300,7 @@ function mockResponse(term) {
       note: "Collocation: headword + for ~",
     },
     domains: [],
+    word_family: [],
     synonyms: ["ability", "talent"],
     antonyms: ["inability"],
   };
