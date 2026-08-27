@@ -1,3 +1,4 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 // api/define.js
 // POST { term } -> JSON (general + domains + synonyms/antonyms optional view-only)
 // Returns collocation/phrase-style examples (not sentences) and a short note.
@@ -16,7 +17,6 @@ export default async function handler(req, res) {
     }
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    console.log("DEBUG API key loaded?", !!OPENAI_API_KEY, OPENAI_API_KEY?.slice(0, 12));
     if (!OPENAI_API_KEY) {
       console.warn("No OPENAI_API_KEY found — using mock response");
       return res.status(200).json(mockResponse(term));

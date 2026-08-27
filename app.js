@@ -1,36 +1,28 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 // === Google API initialization ===
 let googleToken = null;
 
 window.initGoogle = async function initGoogle() {
-  // Wait for gapi
   await new Promise(resolve => {
     if (window.gapi) return resolve();
     const t = setInterval(() => { if (window.gapi) { clearInterval(t); resolve(); } }, 200);
   });
-
-  // Load client
   await new Promise(resolve => gapi.load('client', resolve));
-
-  // Init discovery docs
   await gapi.client.init({
     discoveryDocs: [
       'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
       'https://sheets.googleapis.com/$discovery/rest?version=v4',
     ],
   });
-
-  // Google Identity Services (OAuth)
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: window.GS_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
     callback: (tokenResponse) => {
       googleToken = tokenResponse.access_token;
-      gapi.client.setToken({ access_token: googleToken }); // important
+      gapi.client.setToken({ access_token: googleToken });
       console.log('✅ Logged in with Google');
     },
   });
-
-  // Ensure we have an access token before API calls
   window.ensureGoogleAuth = function ensureGoogleAuth() {
     return new Promise((resolve) => {
       if (googleToken) return resolve(googleToken);
@@ -59,6 +51,9 @@ const el = {
   btnResetFilters: document.getElementById("btnResetFilters"),
   table: document.getElementById("glossaryTable"),
   topActions: document.querySelector(".top-actions"),
+  searchStatus: document.getElementById("searchStatus"),
+  glossaryCount: document.getElementById("glossaryCount"),
+  glossaryEmpty: document.getElementById("glossaryEmpty"),
 };
 
 // Make table horizontally scrollable on small screens
@@ -72,7 +67,9 @@ const el = {
   wrap.appendChild(t);
 })();
 
+// Declared early so renderGlossaryTable can use FIELDS on first render
 const STORAGE_KEY = "domainGlossary.v1";
+const FIELDS = ["word", "sense", "definition_en", "translation_ja", "example_en", "note"];
 let glossary = loadGlossary();
 
 // Wire basic events
@@ -98,15 +95,6 @@ el.btnResetFilters?.addEventListener("click", () => {
   renderGlossaryTable(glossary);
 });
 
-// First render
-try {
-  renderGlossaryTable(glossary);
-  updateDomainFilterOptions(glossary);
-  setOnlineBadge();
-} catch (e) {
-  console.error("Initial render error:", e);
-}
-
 // Online badge
 function setOnlineBadge() {
   if (!el.netBadge) return;
@@ -121,39 +109,126 @@ function setOnlineBadge() {
 window.addEventListener("online", setOnlineBadge);
 window.addEventListener("offline", setOnlineBadge);
 
+// ======================================================================
+// TTS helpers
+// ======================================================================
+let currentAudio = null;
+
+async function playTTS(text, btn) {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+    document.querySelectorAll(".tts-btn.playing").forEach(b => {
+      b.classList.remove("playing");
+      resetTTSButton(b);
+    });
+  }
+  btn.classList.add("playing");
+  btn.innerHTML = ttsIcon() + " Playing…";
+  btn.disabled = true;
+  try {
+    const resp = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!resp.ok) throw new Error("TTS request failed");
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    currentAudio = new Audio(url);
+    await currentAudio.play();
+    currentAudio.onended = () => {
+      btn.classList.remove("playing");
+      resetTTSButton(btn);
+      btn.disabled = false;
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+    };
+  } catch (err) {
+    console.error("TTS error:", err);
+    btn.classList.remove("playing");
+    resetTTSButton(btn);
+    btn.disabled = false;
+    alert("Could not play audio. Check your API key.");
+  }
+}
+
+function resetTTSButton(btn) {
+  btn.innerHTML = btn.classList.contains("tts-word-btn") ? ttsIcon() : ttsIcon() + " Play";
+}
+
+function ttsIcon() {
+  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:3px"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`;
+}
+
+function makeWordTTSBtn(word) {
+  const btn = document.createElement("button");
+  btn.className = "tts-btn tts-word-btn";
+  btn.innerHTML = ttsIcon();
+  btn.title = "Listen to word pronunciation";
+  btn.setAttribute("aria-label", `Listen to ${word}`);
+  btn.addEventListener("click", () => playTTS(word, btn));
+  return btn;
+}
+
+function makeTTSBtn(text) {
+  const btn = document.createElement("button");
+  btn.className = "tts-btn";
+  btn.innerHTML = ttsIcon() + " Play";
+  btn.title = "Listen to word and definition";
+  btn.setAttribute("aria-label", "Listen to this definition");
+  btn.addEventListener("click", () => playTTS(text, btn));
+  return btn;
+}
+
 // -------------------------------
-// Search (unchanged behavior)
+// Search
 // -------------------------------
 async function onSearch() {
   const term = (el.input?.value || "").trim();
   clearResults();
   if (!term) return showError("Please type a word or short phrase.");
+  setSearchBusy(true, `Looking up “${term}”…`);
   try {
     const resp = await fetch("/api/define", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ term }),
     });
-    if (!resp.ok) throw new Error(`API error ${resp.status}: ${await resp.text()}`);
+    if (!resp.ok) throw new Error("The definition service is unavailable right now. Please try again shortly.");
     const data = await resp.json();
     renderResults(term, data);
+    setSearchBusy(false, `Results for “${data.headword || term}”`);
   } catch (err) {
     console.error(err);
     showError(String(err?.message || err));
+    setSearchBusy(false, "We couldn’t complete that search.");
   }
 }
 
-function clearResults() { if (el.results) el.results.innerHTML = ""; }
+function setSearchBusy(busy, message = "") {
+  if (el.btnSearch) {
+    el.btnSearch.disabled = busy;
+    el.btnSearch.textContent = busy ? "Searching…" : "Search";
+  }
+  if (el.input) el.input.setAttribute("aria-busy", String(busy));
+  if (el.results) el.results.setAttribute("aria-busy", String(busy));
+  if (el.searchStatus) el.searchStatus.textContent = message;
+}
+function clearResults() {
+  if (el.results) el.results.innerHTML = "";
+  if (el.searchStatus) el.searchStatus.textContent = "";
+}
 function showError(msg) {
   if (!el.results) return;
   const div = document.createElement("div");
-  div.className = "card error";
-  div.textContent = `Error: ${msg}`;
+  div.className = "error-message";
+  div.textContent = msg;
   el.results.appendChild(div);
 }
 
 // -------------------------------
-// Results rendering (save to localStorage only)
+// Results rendering
 // -------------------------------
 function renderResults(typedTerm, data) {
   if (!el.results) return;
@@ -163,7 +238,7 @@ function renderResults(typedTerm, data) {
   if (data.corrected_to && data.corrected_to !== typedTerm) {
     const tip = document.createElement("div");
     tip.className = "notice";
-    tip.textContent = `Interpreted as “${data.corrected_to}”.`;
+    tip.textContent = `Interpreted as "${data.corrected_to}".`;
     notices.appendChild(tip);
   }
   if (Array.isArray(data.did_you_mean) && data.did_you_mean.length) {
@@ -187,44 +262,99 @@ function renderResults(typedTerm, data) {
 
   // General card
   const genCard = document.createElement("section");
-  genCard.className = "card";
+  genCard.className = "card dict-card";
+
   const head = document.createElement("h2");
-  head.textContent = `${data.headword || typedTerm} · General`;
+  head.className = "dict-headword";
+  head.appendChild(document.createTextNode(data.headword || typedTerm));
+  head.appendChild(makeWordTTSBtn(data.headword || typedTerm));
+  const headLabel = document.createElement("span");
+  headLabel.className = "dict-domain-label";
+  headLabel.textContent = "General";
+  head.appendChild(headLabel);
   genCard.appendChild(head);
-  genCard.appendChild(kv("Definition (EN)", data?.general?.definition_en || "—"));
-  genCard.appendChild(kv("Translation (JA)", data?.general?.translation_ja || "—"));
-  if (data?.general?.example_en) genCard.appendChild(kv("Example", data.general.example_en));
-  if (data?.general?.note) genCard.appendChild(kv("Note", data.general.note));
+
+  const senses = Array.isArray(data?.general?.senses) && data.general.senses.length
+    ? data.general.senses
+    : [{ pos: "", definition_en: data?.general?.definition_en, translation_ja: data?.general?.translation_ja, example_en: data?.general?.example_en, note: data?.general?.note }];
+
+  const senseList = document.createElement("ol");
+  senseList.className = "dict-senses";
+
+  senses.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.className = "dict-sense";
+
+    const numBadge = document.createElement("span");
+    numBadge.className = "dict-sense-num";
+    numBadge.textContent = i + 1;
+
+    const body = document.createElement("div");
+    body.className = "dict-sense-body";
+
+    if (s.pos) {
+      const pos = document.createElement("span");
+      pos.className = "dict-pos";
+      pos.textContent = s.pos;
+      body.appendChild(pos);
+    }
+
+    const defEn = document.createElement("div");
+    defEn.className = "dict-def-en";
+    defEn.textContent = s.definition_en || "—";
+    body.appendChild(defEn);
+
+    if (s.translation_ja) {
+      const ja = document.createElement("div");
+      ja.className = "dict-def-ja";
+      ja.textContent = s.translation_ja;
+      body.appendChild(ja);
+    }
+
+    if (s.example_en) {
+      const ex = document.createElement("div");
+      ex.className = "dict-example";
+      ex.textContent = `"${s.example_en}"`;
+      body.appendChild(ex);
+    }
+
+    if (s.note) {
+      const note = document.createElement("div");
+      note.className = "dict-note";
+      note.textContent = `Note: ${s.note}`;
+      body.appendChild(note);
+    }
+
+    const senseActions = document.createElement("div");
+    senseActions.className = "dict-sense-actions";
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "dict-add-btn";
+    addBtn.textContent = "+ Add to Glossary";
+    addBtn.addEventListener("click", () => {
+      addToGlossary({
+        word: data.headword || typedTerm,
+        sense: s.pos ? `General (${s.pos})` : "General",
+        definition_en: s.definition_en || "",
+        translation_ja: s.translation_ja || "",
+        example_en: s.example_en || "",
+        note: s.note || "",
+      });
+    });
+    senseActions.appendChild(addBtn);
+    senseActions.appendChild(makeTTSBtn(`${data.headword || typedTerm}. ${s.definition_en || ""}`));
+    body.appendChild(senseActions);
+
+    li.appendChild(numBadge);
+    li.appendChild(body);
+    senseList.appendChild(li);
+  });
+
+  genCard.appendChild(senseList);
+
   if (Array.isArray(data.synonyms) && data.synonyms.length) genCard.appendChild(kv("Synonyms", data.synonyms.join(", ")));
   if (Array.isArray(data.antonyms) && data.antonyms.length) genCard.appendChild(kv("Antonyms", data.antonyms.join(", ")));
   renderRelatedForms(genCard, data.related_forms);
-
-  genCard.appendChild(
-    actionRow({
-      label: "Send to My Glossary",
-      onClick: () => {
-        addToGlossary({
-          word: data.headword || typedTerm,
-          sense: "General",
-          definition_en: data?.general?.definition_en || "",
-          translation_ja: data?.general?.translation_ja || "",
-          example_en: data?.general?.example_en || "",
-          note: data?.general?.note || "",
-        });
-      },
-    })
-  );
-  genCard.appendChild(
-    copyRow(() =>
-      textBlock({
-        word: data.headword || typedTerm,
-        sense: "General",
-        def: data?.general?.definition_en,
-        ja: data?.general?.translation_ja,
-        ex: data?.general?.example_en,
-      })
-    )
-  );
   el.results.appendChild(genCard);
 
   // Domain cards
@@ -238,21 +368,26 @@ function renderResults(typedTerm, data) {
     card.appendChild(kv("Translation (JA)", d.translation_ja || "—"));
     if (d.example_en) card.appendChild(kv("Example", d.example_en));
     if (d.note) card.appendChild(kv("Note", d.note));
-    card.appendChild(
-      actionRow({
-        label: "Send to My Glossary",
-        onClick: () => {
-          addToGlossary({
-            word: data.headword || typedTerm,
-            sense: d.domain,
-            definition_en: d.definition_en || "",
-            translation_ja: d.translation_ja || "",
-            example_en: d.example_en || "",
-            note: d.note || "",
-          });
-        },
-      })
-    );
+
+    const domainActions = document.createElement("div");
+    domainActions.className = "actions";
+    const domainAddBtn = document.createElement("button");
+    domainAddBtn.className = "primary";
+    domainAddBtn.textContent = "Send to My Glossary";
+    domainAddBtn.addEventListener("click", () => {
+      addToGlossary({
+        word: data.headword || typedTerm,
+        sense: d.domain,
+        definition_en: d.definition_en || "",
+        translation_ja: d.translation_ja || "",
+        example_en: d.example_en || "",
+        note: d.note || "",
+      });
+    });
+    domainActions.appendChild(domainAddBtn);
+    domainActions.appendChild(makeTTSBtn(`${data.headword || typedTerm}. ${d.definition_en || ""}`));
+    card.appendChild(domainActions);
+
     card.appendChild(
       copyRow(() =>
         textBlock({
@@ -296,18 +431,26 @@ function loadGlossary() {
 }
 function saveGlossary(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function addToGlossary(item) {
+  const duplicate = glossary.some((row) =>
+    row.word?.toLowerCase() === item.word?.toLowerCase() &&
+    row.sense === item.sense &&
+    row.definition_en === item.definition_en
+  );
+  if (duplicate) {
+    if (el.searchStatus) el.searchStatus.textContent = "This definition is already in your glossary.";
+    return;
+  }
   glossary.push({ ...item, createdAt: new Date().toISOString() });
   saveGlossary(glossary);
   renderGlossaryTable(glossary);
   updateDomainFilterOptions(glossary);
   DataBox.refreshAfterExternalChange();
+  if (el.searchStatus) el.searchStatus.textContent = `Added “${item.word}” to your glossary.`;
 }
 
 // -------------------------------
 // Table rendering
 // -------------------------------
-const FIELDS = ["word", "sense", "definition_en", "translation_ja", "example_en", "note"];
-
 function renderGlossaryTable(data) {
   const tbody = el.table?.querySelector("tbody");
   if (!tbody) return;
@@ -324,6 +467,20 @@ function renderGlossaryTable(data) {
       const passDomain = !fd || row.sense === fd;
       return passText && passDomain;
     });
+
+  if (el.glossaryCount) {
+    el.glossaryCount.textContent = `${rows.length} ${rows.length === 1 ? "entry" : "entries"}`;
+  }
+  if (el.glossaryEmpty) {
+    el.glossaryEmpty.hidden = rows.length !== 0;
+    const hasFilters = Boolean(ft || fd);
+    const strong = el.glossaryEmpty.querySelector("strong");
+    const detail = el.glossaryEmpty.querySelector("span");
+    if (strong) strong.textContent = hasFilters ? "No matching entries." : "Your glossary is empty.";
+    if (detail) detail.textContent = hasFilters
+      ? "Try changing or resetting your filters."
+      : "Search for a term and add the definition that fits your context.";
+  }
 
   rows.forEach((row) => {
     const tr = document.createElement("tr");
@@ -348,23 +505,20 @@ function updateDomainFilterOptions(data) {
   const sel = el.filterDomain; if (!sel) return;
   const keep = sel.value;
   const domains = [...new Set(data.map((r) => r.sense).filter(Boolean))].sort();
-
   sel.innerHTML = "";
   const optAll = document.createElement("option");
   optAll.value = ""; optAll.textContent = "All domains";
   sel.appendChild(optAll);
-
   domains.forEach((d) => {
     const opt = document.createElement("option");
     opt.value = d; opt.textContent = d;
     sel.appendChild(opt);
   });
-
   sel.value = keep || "";
 }
 
 // -------------------------------
-/* TSV Export */
+// TSV Export
 // -------------------------------
 function downloadTSV() {
   if (!glossary.length) return alert("No items in glossary.");
@@ -383,65 +537,26 @@ function downloadTSV() {
 // ======================================================================
 // Google Sheets integration
 // ======================================================================
-
-// Apply nicer design on new sheets
 async function applySheetDesign(spreadsheetId, targetSheetId = 0) {
   await gapi.client.sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     resource: {
       requests: [
-        // Column widths A..G
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 1 },
-            properties: { pixelSize: 140 }, fields: "pixelSize" }}, // A Word
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 1, endIndex: 2 },
-            properties: { pixelSize: 120 }, fields: "pixelSize" }}, // B Sense
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 2, endIndex: 3 },
-            properties: { pixelSize: 320 }, fields: "pixelSize" }}, // C Definition
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 3, endIndex: 4 },
-            properties: { pixelSize: 240 }, fields: "pixelSize" }}, // D Translation
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 4, endIndex: 5 },
-            properties: { pixelSize: 280 }, fields: "pixelSize" }}, // E Example
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 5, endIndex: 6 },
-            properties: { pixelSize: 240 }, fields: "pixelSize" }}, // F Note
-        { updateDimensionProperties: {
-            range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 6, endIndex: 7 },
-            properties: { pixelSize: 180 }, fields: "pixelSize" }}, // G Created At
-
-        // Wrap text in C..F for data rows
-        { repeatCell: {
-            range: { sheetId: targetSheetId, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: 6 },
-            cell: { userEnteredFormat: { wrapStrategy: "WRAP" } },
-            fields: "userEnteredFormat.wrapStrategy"
-        }},
-
-        // Alternating row banding (includes header)
-        { addBanding: {
-            bandedRange: {
-              range: { sheetId: targetSheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 7 },
-              rowProperties: {
-                headerColor: { red: 0.91, green: 0.94, blue: 0.99 },
-                firstBandColor: { red: 0.98, green: 0.98, blue: 1.00 },
-                secondBandColor: { red: 1.00, green: 1.00, blue: 1.00 }
-              }
-            }
-        }},
-
-        // Basic filter on header row
-        { setBasicFilter: {
-            filter: { range: { sheetId: targetSheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 7 } }
-        }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 140 }, fields: "pixelSize" }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 1, endIndex: 2 }, properties: { pixelSize: 120 }, fields: "pixelSize" }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 2, endIndex: 3 }, properties: { pixelSize: 320 }, fields: "pixelSize" }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 3, endIndex: 4 }, properties: { pixelSize: 240 }, fields: "pixelSize" }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 4, endIndex: 5 }, properties: { pixelSize: 280 }, fields: "pixelSize" }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 5, endIndex: 6 }, properties: { pixelSize: 240 }, fields: "pixelSize" }},
+        { updateDimensionProperties: { range: { sheetId: targetSheetId, dimension: "COLUMNS", startIndex: 6, endIndex: 7 }, properties: { pixelSize: 180 }, fields: "pixelSize" }},
+        { repeatCell: { range: { sheetId: targetSheetId, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: 6 }, cell: { userEnteredFormat: { wrapStrategy: "WRAP" } }, fields: "userEnteredFormat.wrapStrategy" }},
+        { addBanding: { bandedRange: { range: { sheetId: targetSheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 7 }, rowProperties: { headerColor: { red: 0.91, green: 0.94, blue: 0.99 }, firstBandColor: { red: 0.98, green: 0.98, blue: 1.00 }, secondBandColor: { red: 1.00, green: 1.00, blue: 1.00 } } } }},
+        { setBasicFilter: { filter: { range: { sheetId: targetSheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 7 } } }},
       ]
     }
   });
 }
 
-// Main send function (now with duplicate prevention)
 async function sendGlossaryToGoogleSheets(className = "") {
   const glossaryRaw = localStorage.getItem("domainGlossary.v1");
   if (!glossaryRaw) return alert("No glossary data to send.");
@@ -451,11 +566,9 @@ async function sendGlossaryToGoogleSheets(className = "") {
   className = (className || "").trim();
   const spreadsheetTitle = className ? `Glossary Data – ${className}` : "Glossary Data";
 
-  // 1) Find or create Spreadsheet
   const findRes = await gapi.client.drive.files.list({
     q: `name='${spreadsheetTitle}' and mimeType='application/vnd.google-apps.spreadsheet'`,
-    fields: "files(id, name)",
-    spaces: "drive",
+    fields: "files(id, name)", spaces: "drive",
   });
 
   let spreadsheetId;
@@ -464,97 +577,32 @@ async function sendGlossaryToGoogleSheets(className = "") {
   if (findRes.result.files && findRes.result.files.length > 0) {
     spreadsheetId = findRes.result.files[0].id;
   } else {
-    // Create
-    const createRes = await gapi.client.sheets.spreadsheets.create({
-      properties: { title: spreadsheetTitle },
-    });
+    const createRes = await gapi.client.sheets.spreadsheets.create({ properties: { title: spreadsheetTitle } });
     spreadsheetId = createRes.result.spreadsheetId;
     firstSheetId = createRes.result.sheets?.[0]?.properties?.sheetId ?? 0;
-
-    // Rename first sheet to "Glossary"
-    await gapi.client.sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      resource: {
-        requests: [
-          {
-            updateSheetProperties: {
-              properties: { sheetId: firstSheetId, title: "Glossary" },
-              fields: "title",
-            },
-          },
-        ],
-      },
-    });
-
-    // Header row
+    await gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId, resource: { requests: [{ updateSheetProperties: { properties: { sheetId: firstSheetId, title: "Glossary" }, fields: "title" } }] } });
     const headers = [["Word","Sense","Definition (EN)","Translation (JA)","Example (EN)","Note","Created At"]];
-    await gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: "Glossary!A1:G1",
-      valueInputOption: "RAW",
-      resource: { values: headers },
-    });
-
-    // Style header + freeze + design
-    await gapi.client.sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      resource: {
-        requests: [
-          {
-            repeatCell: {
-              range: { sheetId: firstSheetId, startRowIndex: 0, endRowIndex: 1 },
-              cell: { userEnteredFormat: { backgroundColor: { red: 0.91, green: 0.94, blue: 0.99 }, textFormat: { bold: true } } },
-              fields: "userEnteredFormat(backgroundColor,textFormat)",
-            },
-          },
-          {
-            updateSheetProperties: {
-              properties: { sheetId: firstSheetId, gridProperties: { frozenRowCount: 1 } },
-              fields: "gridProperties.frozenRowCount",
-            },
-          },
-        ],
-      },
-    });
-
+    await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId, range: "Glossary!A1:G1", valueInputOption: "RAW", resource: { values: headers } });
+    await gapi.client.sheets.spreadsheets.batchUpdate({ spreadsheetId, resource: { requests: [
+      { repeatCell: { range: { sheetId: firstSheetId, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { backgroundColor: { red: 0.91, green: 0.94, blue: 0.99 }, textFormat: { bold: true } } }, fields: "userEnteredFormat(backgroundColor,textFormat)" } },
+      { updateSheetProperties: { properties: { sheetId: firstSheetId, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
+    ] } });
     await applySheetDesign(spreadsheetId, firstSheetId);
   }
 
-  // 2) Duplicate prevention — read existing Created At values
-  const existingRes = await gapi.client.sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: "Glossary!G2:G",
-  });
+  const existingRes = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId, range: "Glossary!G2:G" });
   const existingSet = new Set((existingRes.result.values || []).map(r => r[0]).filter(Boolean));
-
-  // Build only NEW items
   const listWithIds = list.map(item => ({ ...item, createdAt: item.createdAt || new Date().toISOString() }));
   const newItems = listWithIds.filter(it => !existingSet.has(it.createdAt));
+  if (newItems.length === 0) { alert("No new items to send (everything already in the Sheet)."); return; }
 
-  if (newItems.length === 0) {
-    alert("No new items to send (everything already in the Sheet).");
-    return;
-  }
-
-  // 3) Append rows (chunked)
-  const values = newItems.map(it => [
-    it.word || "", it.sense || "", it.definition_en || "", it.translation_ja || "",
-    it.example_en || "", it.note || "", it.createdAt
-  ]);
-
+  const values = newItems.map(it => [it.word || "", it.sense || "", it.definition_en || "", it.translation_ja || "", it.example_en || "", it.note || "", it.createdAt]);
   const CHUNK = 400;
   for (let i = 0; i < values.length; i += CHUNK) {
     const chunk = values.slice(i, i + CHUNK);
-    await gapi.client.sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: "Glossary!A2:G",
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      resource: { values: chunk },
-    });
+    await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId, range: "Glossary!A2:G", valueInputOption: "RAW", insertDataOption: "INSERT_ROWS", resource: { values: chunk } });
   }
-
-  alert(`✅ Sent ${values.length} new item(s) to “${spreadsheetTitle}”.`);
+  alert(`✅ Sent ${values.length} new item(s) to "${spreadsheetTitle}".`);
 }
 
 // -------------------------------
@@ -623,7 +671,6 @@ const DataBox = (() => {
     const table = el.table; if (!table) return;
     const wrap = table.parentElement;
     const box  = wrap?.parentElement || (table.closest(".card") ?? document.body);
-
     let host = box.querySelector("#glossaryControls");
     if (!host) {
       host = document.createElement("div");
@@ -631,9 +678,8 @@ const DataBox = (() => {
       host.className = "glossary-controls";
       box.insertBefore(host, wrap);
     }
-    if (host.querySelector("#btnEditMode")) return; // avoid duplicates
+    if (host.querySelector("#btnEditMode")) return;
 
-    // Compact
     const btnCompact = document.createElement("button");
     btnCompact.id = "btnCompact";
     btnCompact.textContent = "Compact";
@@ -682,7 +728,6 @@ const DataBox = (() => {
     host.appendChild(btnUndo);
     host.appendChild(btnRedo);
 
-    // Class name input (persists)
     const classWrap = document.createElement("span");
     classWrap.style.marginLeft = "8px";
     const clsInput = document.createElement("input");
@@ -690,16 +735,13 @@ const DataBox = (() => {
     clsInput.placeholder = "Class name (optional)";
     clsInput.value = localStorage.getItem("gs.className") || "";
     clsInput.style.minWidth = "14ch";
-    clsInput.addEventListener("input", () => {
-      localStorage.setItem("gs.className", clsInput.value.trim());
-    });
+    clsInput.addEventListener("input", () => { localStorage.setItem("gs.className", clsInput.value.trim()); });
     classWrap.appendChild(clsInput);
     host.appendChild(classWrap);
 
-    // Send to Sheets button
     const btnSend = document.createElement("button");
     btnSend.id = "btnSendToSheets";
-    btnSend.textContent = "Send to Google Spread.";
+    btnSend.textContent = "Send to Google Sheets";
     btnSend.title = "Sign in and append your glossary to Google Sheets";
     btnSend.addEventListener("click", async () => {
       try {
@@ -730,6 +772,7 @@ const DataBox = (() => {
     const createdAt = (tds[6]?.textContent || "").trim();
     return `${word}|||${sense}|||${createdAt}`;
   }
+
   function findGlossaryIndexById(id) {
     const [word, sense, createdAt] = id.split("|||");
     for (let i = 0; i < glossary.length; i++) {
@@ -743,7 +786,6 @@ const DataBox = (() => {
     const trimmed = (raw || "").replace(/\s+/g, " ").trim();
     const required = { word: true, sense: false, definition_en: true, translation_ja: true, example_en: false, note: false };
     if (required[field] && trimmed.length === 0) return { ok: false, value: "", message: "Required" };
-
     switch (field) {
       case "word":
       case "sense": return trimmed.length > 80 ? { ok:false, value:"", message:"≤ 80 chars" } : { ok:true, value: trimmed };
@@ -771,20 +813,16 @@ const DataBox = (() => {
     const table = el.table;
     const tbody = table?.querySelector("tbody");
     if (!tbody) return;
-
     if (!document.getElementById("glossaryControls")) injectControls();
-
     [...tbody.querySelectorAll("td")].forEach((td) => {
       td.removeAttribute("data-databox-field");
       td.removeAttribute("data-databox-id");
       td.removeAttribute("title");
       td.classList.remove("cell-error","staged");
     });
-
     [...tbody.rows].forEach((tr) => {
       const id = rowIdFromTr(tr);
       const cells = [...tr.cells];
-
       cells.forEach((td, idx) => {
         const field =
           idx === 0 ? "word" :
@@ -794,16 +832,13 @@ const DataBox = (() => {
           idx === 4 ? "example_en" :
           idx === 5 ? "note" :
           idx === 6 ? "createdAt" : null;
-
         if (!field) return;
         const editable = editing && field !== "createdAt";
         td.contentEditable = editable ? "true" : "false";
         td.spellcheck = false;
         td.dataset.databoxField = field;
         td.dataset.databoxId = id;
-
         if (!editable) { td.onfocus = td.onblur = td.onkeydown = null; return; }
-
         let originalText = td.textContent || "";
         td.onfocus = () => { originalText = td.textContent || ""; td.classList.remove("cell-error"); td.removeAttribute("title"); };
         td.onkeydown = (e) => {
@@ -825,7 +860,6 @@ const DataBox = (() => {
         };
       });
     });
-
     renderEditChip();
   }
 
@@ -834,7 +868,6 @@ const DataBox = (() => {
     const wrap = table.parentElement;
     const box  = wrap?.parentElement || (table.closest(".card") ?? document.body);
     const host = box.querySelector("#glossaryControls") || box;
-
     let chip = document.getElementById("editModeChip");
     if (!chip) { chip = document.createElement("div"); chip.id = "editModeChip"; chip.className = "hint"; host.appendChild(chip); }
     chip.textContent = editing ? "Edit mode: ON (Enter=stage, Save=commit, Esc=cancel cell)" : "";
@@ -897,6 +930,11 @@ const DataBox = (() => {
     refreshAfterExternalChange() { staged = Object.create(null); renderGlossaryTable(glossary); wireTable(); updateButtons(); },
   };
 })();
+
+// Render after all table enhancements have been initialized.
+renderGlossaryTable(glossary);
+updateDomainFilterOptions(glossary);
+setOnlineBadge();
 DataBox.wireTable();
 
 // === Missing Example/Note filters (view-only) ===

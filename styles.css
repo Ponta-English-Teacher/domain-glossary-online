@@ -1,3 +1,4 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 :root{
   --bg:#f6f7fb; 
   --card:#fff; 
@@ -43,7 +44,7 @@ body{
   align-items:center; 
   justify-content:space-between;
   padding:16px 24px;
-  background:#fff;
+  background:var(--card);
   color:var(--text);
   border-bottom:1px solid var(--border);
 }
@@ -81,13 +82,14 @@ body{
   padding:12px 14px;
   border:1px solid var(--border); 
   border-radius:10px; 
-  background:#fff;
+  background:var(--card);
+  color:var(--text);
 }
 button{
   padding:12px 16px; 
   border-radius:10px; 
   border:1px solid var(--border);
-  background:#fff; 
+  background:var(--card); 
   color:var(--text); 
   font-size:16px; 
   cursor:pointer;
@@ -112,7 +114,7 @@ button:disabled{ opacity:.55; cursor:not-allowed }
   border:1px solid var(--border); 
   border-radius:14px; 
   padding:16px; 
-  background:#fff;
+  background:var(--card);
   display:flex; 
   flex-direction:column; 
   gap:8px; 
@@ -129,7 +131,9 @@ button:disabled{ opacity:.55; cursor:not-allowed }
   padding:10px 12px; 
   border:1px solid var(--border); 
   border-radius:10px; 
-  font-size:16px
+  font-size:16px;
+  background:var(--card);
+  color:var(--text);
 }
 .table-wrap{overflow:auto}
 table{width:100%; border-collapse:collapse; font-size:16px}
@@ -152,6 +156,133 @@ tbody tr:nth-child(odd){ background:#fbfbfd }
 
 /* Footer */
 .footer{padding:18px; text-align:center; color:var(--muted)}
+
+/* =========================================================
+   Dictionary-style General card
+   ========================================================= */
+.dict-card { border-left: 4px solid var(--primary); }
+
+.dict-headword {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dict-domain-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--primary);
+  background: rgba(37,99,235,0.08);
+  border: 1px solid rgba(37,99,235,0.2);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.dict-senses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.dict-sense {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.dict-sense:first-child { border-top: none; }
+
+.dict-sense-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 3px;
+}
+
+.dict-sense-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+.dict-pos {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--muted);
+  background: var(--border);
+  border-radius: 4px;
+  padding: 1px 7px;
+  margin-bottom: 2px;
+  width: fit-content;
+}
+
+.dict-def-en  { font-size: 16px; color: var(--text); line-height: 1.5; }
+.dict-def-ja  { font-size: 15px; color: var(--muted); }
+.dict-example { font-size: 14px; color: var(--muted); font-style: italic; }
+.dict-note    { font-size: 13px; color: var(--muted); }
+
+.dict-sense-actions { margin-top: 6px; }
+
+.dict-add-btn {
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.dict-add-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* =========================================================
+   TTS Play buttons
+   ========================================================= */
+.tts-btn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  gap: 2px;
+}
+.tts-btn:hover { background: var(--border); }
+.tts-btn.playing { border-color: var(--primary); color: var(--primary); }
+.tts-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Word-level button — icon only, sits inline with headword */
+.tts-word-btn {
+  padding: 3px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+
 
 /* Dark mode */
 @media (prefers-color-scheme: dark){
@@ -257,3 +388,143 @@ td.cell-error{ outline: 2px solid rgba(220,38,38,.45); background: rgba(220,38,3
 .missing-filters{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .missing-filters .chk{ font-size:14px; color:var(--muted); }
 .missing-filters input{ transform: translateY(1px); }
+
+/* =========================================================
+   2026 interface refresh
+   ========================================================= */
+:root{
+  --bg:#f3f6f8;
+  --card:#ffffff;
+  --text:#172027;
+  --muted:#64727c;
+  --primary:#176b65;
+  --primary-hover:#105b56;
+  --danger:#b83d45;
+  --border:#dce4e7;
+  --accent:#e1f1ee;
+  --shadow:0 12px 34px rgba(22,49,55,.08);
+}
+
+body{
+  background:
+    radial-gradient(circle at 10% 0%, rgba(44,137,127,.10), transparent 30rem),
+    linear-gradient(180deg,#f8faf9 0%,var(--bg) 55%,#eef2f3 100%);
+  font-size:16px;
+  line-height:1.55;
+}
+
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+}
+
+.topbar{
+  max-width:1160px;
+  margin:20px auto 0;
+  padding:18px 24px;
+  border:1px solid rgba(220,228,231,.9);
+  border-radius:18px;
+  box-shadow:0 8px 28px rgba(22,49,55,.06);
+}
+
+.brand{display:flex; align-items:center; gap:13px; min-width:0}
+.brand-mark{
+  display:grid;
+  place-items:center;
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  flex:0 0 auto;
+  color:white;
+  font-size:21px;
+  font-weight:800;
+  background:linear-gradient(145deg,#1f7f77,#135c58);
+  box-shadow:0 6px 14px rgba(23,107,101,.22);
+}
+.brand h1{font-size:19px; letter-spacing:-.02em}
+.brand p{margin:2px 0 0; color:var(--muted); font-size:13px}
+.top-actions{gap:8px}
+.badge{background:var(--accent); color:#145e58; font-weight:700; border-radius:999px}
+.badge.offline{background:#fbe7e8; color:#9d2932}
+
+.container{max-width:1160px; margin:20px auto 40px}
+.card{border-radius:18px; padding:26px; box-shadow:var(--shadow)}
+.section-heading{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px}
+.section-heading h2{margin:2px 0 0; font-size:23px; line-height:1.2; letter-spacing:-.025em}
+.eyebrow{color:var(--primary); text-transform:uppercase; letter-spacing:.12em; font-size:11px; font-weight:800}
+.count-badge{padding:5px 10px; border-radius:999px; background:var(--accent); color:#145e58; font-size:12px; font-weight:750}
+
+input,select,button{font:inherit}
+.word-row input,.filters input,.filters select,.glossary-controls input{
+  min-height:44px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--card);
+  color:var(--text);
+}
+.word-row input{font-size:18px; padding:11px 14px}
+.word-row input:focus,.filters input:focus,.filters select:focus,.glossary-controls input:focus{
+  outline:3px solid rgba(23,107,101,.16);
+  border-color:var(--primary);
+}
+button{min-height:42px; padding:9px 14px; font-size:14px; font-weight:650}
+button.primary{background:var(--primary); border-color:var(--primary)}
+button.primary:hover{background:var(--primary-hover)}
+button.danger{background:transparent; color:var(--danger); border-color:#e8bdc0}
+button.danger:hover{background:#fff3f3}
+
+.status-message{min-height:24px; margin-top:8px; color:var(--primary); font-size:14px; font-weight:650}
+.results{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); margin-top:6px}
+.results > .dict-card:first-of-type{grid-column:1/-1}
+.results .card{margin:0; box-shadow:none; border-radius:14px}
+.error-message{padding:13px 15px; border:1px solid #efc5c7; border-radius:11px; background:#fff3f3; color:#982f37}
+.kv-row{display:grid; grid-template-columns:minmax(100px,.35fr) 1fr; gap:12px; padding:8px 0; border-top:1px solid var(--border)}
+.kv-row .k{font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+
+.filters{align-items:center}
+.filters input{flex:1 1 250px}
+.missing-filters{flex:1 1 100%; padding:4px 2px}
+.glossary-controls{justify-content:flex-start; align-items:center; padding:12px 0; border-top:1px solid var(--border)}
+.glossary-controls input{padding:8px 11px}
+.table-scroll{border:1px solid var(--border); border-radius:12px}
+thead th{background:#edf4f2; font-size:12px; text-transform:uppercase; letter-spacing:.04em}
+.created-column,#glossaryTable td:nth-child(7){display:none}
+.empty-state{padding:30px 18px; text-align:center; color:var(--muted); border:1px dashed #cbd7d9; border-radius:12px; background:#fafcfb}
+.empty-state strong,.empty-state span{display:block}
+.empty-state strong{color:var(--text); margin-bottom:4px}
+.footer{max-width:900px; margin:0 auto 20px; font-size:13px}
+
+@media (max-width:760px){
+  .topbar{margin:10px 10px 0; align-items:flex-start; gap:14px; padding:16px}
+  .brand p{display:none}
+  .top-actions{flex-wrap:wrap; justify-content:flex-end}
+  .top-actions .badge{order:-1}
+  .container{margin-top:12px; padding:0 10px}
+  .card{padding:18px; border-radius:15px}
+  .word-row{align-items:stretch}
+  .word-row input{min-width:0}
+  .word-row button{flex:0 0 auto}
+  .glossary-controls{align-items:stretch}
+  .glossary-controls > *{flex:1 1 auto}
+  .glossary-controls span{margin-left:0!important}
+  .glossary-controls input{width:100%}
+  .kv-row{grid-template-columns:1fr; gap:2px}
+}
+
+@media (prefers-color-scheme:dark){
+  :root{--primary:#5fc7bd;--primary-hover:#76d5cc;--accent:#173d3a}
+  body{background:#0d1214}
+  .topbar{background:#11181b}
+  .badge,.count-badge{color:#94e1da}
+  .table-scroll{border-color:var(--border)}
+  thead th{background:#172125}
+  .empty-state{background:#101719}
+  button.danger:hover{background:#2a1719}
+}

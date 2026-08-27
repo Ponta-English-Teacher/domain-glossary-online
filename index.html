@@ -1,26 +1,27 @@
+/opt/homebrew/Library/Homebrew/cmd/shellenv.sh: line 18: /bin/ps: Operation not permitted
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Glossary Making App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Build a focused bilingual glossary with concise general and domain-specific definitions." />
   <meta name="color-scheme" content="light dark" />
   <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="styles.css" />
     <script>window.GS_CLIENT_ID = "77564559951-les7tq5f2alfs3uigm3o2nspehacvtbr.apps.googleusercontent.com";</script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
   </head>
 
 <body>
-  <!-- New App Title Bar -->
-  <header class="app-header">
-    <h1>Glossary Making App</h1>
-  </header>
-
-  <!-- Existing topbar (buttons + Online badge) -->
   <header class="topbar">
-    <h1>Domain Glossary <span class="muted">Online</span></h1>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">G</span>
+      <div>
+        <h1>Domain Glossary</h1>
+        <p>Build a bilingual vocabulary collection for your field.</p>
+      </div>
+    </div>
     <div class="top-actions">
       <button id="btnDownloadTSV" title="Download my glossary as TSV">Download TSV</button>
       <button id="btnClearAll" class="danger" title="Delete my glossary (local)">Clear My Glossary</button>
@@ -31,21 +32,30 @@
   <main class="container">
     <!-- Search -->
     <section class="card">
-      <h2>Search</h2>
+      <div class="section-heading">
+        <div><span class="eyebrow">Discover</span><h2>Look up a term</h2></div>
+      </div>
       <div class="word-row">
-        <input id="wordInput" type="text" placeholder="Enter a word or short phrase (not a full sentence)" autocomplete="off" />
+        <label class="sr-only" for="wordInput">Word or short phrase</label>
+        <input id="wordInput" type="text" placeholder="e.g. interlanguage" autocomplete="off" maxlength="100" />
         <button id="btnSearch" class="primary">Search</button>
       </div>
-      <p class="hint">Results show a General card and relevant domain cards automatically. Keep definitions compact (≤ ~25 words) with direct Japanese equivalents.</p>
-      <div id="results" class="results" aria-live="polite"></div>
+      <p class="hint">Enter a word or short phrase. You’ll get a general meaning plus relevant academic senses, with concise Japanese equivalents.</p>
+      <div id="searchStatus" class="status-message" role="status" aria-live="polite"></div>
+      <div id="results" class="results" aria-live="polite" aria-busy="false"></div>
     </section>
 
     <!-- Glossary -->
     <section class="card">
-      <h2>My Glossary</h2>
+      <div class="section-heading glossary-heading">
+        <div><span class="eyebrow">Your collection</span><h2>My Glossary</h2></div>
+        <span id="glossaryCount" class="count-badge">0 entries</span>
+      </div>
       <div class="filters">
-        <input id="filterText" type="text" placeholder="Filter Word / Definition / Translation" />
-        <select id="filterDomain">
+        <label class="sr-only" for="filterText">Filter glossary</label>
+        <input id="filterText" type="search" placeholder="Filter your glossary" />
+        <label class="sr-only" for="filterDomain">Filter by domain</label>
+        <select id="filterDomain" aria-label="Filter by domain">
           <option value="">All domains</option>
         </select>
         <button id="btnResetFilters">Reset</button>
@@ -60,17 +70,22 @@
               <th>Translation (JA)</th>
               <th>Example</th>
               <th>Note</th>
+              <th class="created-column">Added</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <small class="hint">Tip: TSV imports cleanly to Google Sheets later.</small>
+      <div id="glossaryEmpty" class="empty-state" hidden>
+        <strong>Your glossary is empty.</strong>
+        <span>Search for a term and add the definition that fits your context.</span>
+      </div>
+      <small class="hint">Your glossary is saved in this browser. Download a TSV backup or send new entries to Google Sheets.</small>
     </section>
   </main>
 
   <footer class="footer">
-    <small>Definitions and examples are generated fresh (no copying from proprietary dictionaries). Audio “Play” will use Azure TTS later.</small>
+    <small>Definitions and audio are AI-generated and may contain mistakes. Review important terminology against trusted sources in your field.</small>
   </footer>
 
   <script src="./app.js"></script>
